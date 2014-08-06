@@ -1,0 +1,15 @@
+{
+	"name": "system-mime",
+	"version": "0.0.1",
+	"description": "Get the (system) mimetype of a file (Linux)",
+	"keywords": ["mime", "mimetype", "system", "linux"],
+	"main": "index.js",
+	"dependencies": {
+		"xdg-env": "*"
+	},
+	"homepage": "https://github.com/rawiroaisen/node-system-mime",
+	"repository": "git@github.com:rawiroaisen/node-system-mime.git",
+	"issues": {
+		"url": "https://github.com/rawiroaisen/node-system-mime/issues"
+	}
+}

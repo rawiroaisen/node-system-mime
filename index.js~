@@ -1,0 +1,122 @@
+var fs = require('fs')
+var path = require('path')
+var env = require('xdg-env')
+//var apps = require('xdg/apps')
+
+var mime = module.exports = {}
+
+/*
+var DESKTOP = []
+
+for(var i = 0, de; de = env.CURRENT_DESKTOP[i]; i++){
+	de = de.toLowerCase()
+	if(DESKTOP.indexOf(de) === -1)
+		DESKTOP.push(de);
+}
+
+//$XDG_CONFIG_HOME/$desktop-mimeapps.list					user overrides, desktop-specific (for advanced users)
+for(var i = 0, de; de = DESKTOP[i]; i++)
+	DIRS.push( path.join(env.CONFIG_HOME, de + '-mimeapps.list') );
+
+//$XDG_CONFIG_HOME/mimeapps.list							user overrides (recommended location for user configuration GUIs)
+DIRS.push( path.join(env.CONFIG_HOME, 'mimeapps.list') )
+
+//$XDG_CONFIG_DIRS/$desktop-mimeapps.list					sysadmin and ISV overrides, desktop-specific
+for(var i = 0, dir; dir = env.CONFIG_DIRS[i]; i++)
+	for(var j = 0, de; de = DESKTOP[j]; j++)
+		DIRS.push( path.join(dir, de + '-mimeapps.list') );
+
+//$XDG_CONFIG_DIRS/mimeapps.list							sysadmin and ISV overrides
+for(var i = 0, dir; dir = env.CONFIG_DIRS[i]; i++)
+	DIRS.push( path.join(dir, 'mimeapps.list') );
+
+//INCLUDED IN $XDG_DATA_DIRS
+//$XDG_DATA_HOME/applications/$desktop-mimeapps.list		for completeness, deprecated, desktop-specific
+//for(var i = 0, de; de = DESKTOP[i]; i++)
+//	DIRS.push( path.join(env.DATA_HOME, 'applications', de + '-mimeapps.list') );
+
+//$XDG_DATA_HOME/applications/mimeapps.list					for compatibility, deprecated
+//DIRS.push( path.join(env.DATA_HOME, 'applications', 'mimeapps.list') );
+
+//$XDG_DATA_DIRS/applications/$desktop-mimeapps.list		distribution-provided defaults, desktop-specific
+for(var i = 0, dir; dir = env.DATA_DIRS[i]; i++)
+	for(var j = 0, de; de = DESKTOP[j]; j++)
+		DIRS.push( path.join(dir, 'applications', de + '-mimeapps.list') );
+
+//$XDG_DATA_DIRS/applications/mimeapps.list					distribution-provided defaults
+for(var i = 0, dir; dir = env.DATA_DIRS[i]; i++)
+	DIRS.push( path.join( dir, 'applications', 'mimeapps.list' ) );
+
+DIRS = DIRS.filter(fs.existsSync)
+*/
+
+var start = process.hrtime()
+
+var GLOB_EXTENSIONS = Object.create(null)
+var GLOB_REGEXP = []
+
+var DIRS = env.DATA_DIRS.map(function(dir){
+	return path.join(dir, 'mime')
+}).filter(fs.existsSync)
+
+;(function(){
+	var ESCAPE_REG_EXP =  /([.+?^=!:${}()|\/\\])/g
+	var EXTENSION_GLOB_REGEXP = /^\*\.[^\*\?\[]+$/
+
+	function glob2regexp(glob, sensitive){
+		return new RegExp('^' + glob.replace(ESCAPE_REG_EXP, '\\$1').replace(/\*/g, '.*') + '$', sensitive ? '' : 'i')
+	}
+
+	// NO OVERRIDE (IN CURRENT FILE NEITHER)
+
+	for(var i = 0, dir; dir = DIRS[i]; i++){
+		try{
+			var content = fs.readFileSync( path.join(dir, 'globs2'), 'utf-8' )
+		} catch(e){
+			continue
+		}
+
+		var lines = content.split('\n')
+
+		for(var j = 0, line; line = lines[j]; j++){
+
+			if(line.charAt(0) === '#')
+				continue;
+
+			var glob = line.split(':')
+			var cs = glob[3] === 'cs'
+
+			if(!cs && EXTENSION_GLOB_REGEXP.test(glob[2])){
+				var ext = glob[2].substring(2).toLowerCase()
+				if(!GLOB_EXTENSIONS[ext])
+					GLOB_EXTENSIONS[ext] = glob[1];
+
+			} else{
+				GLOB_REGEXP.push([glob2regexp(glob[2], cs), glob[1]])
+			}
+		}
+	}
+})()
+
+console.log('Mime loaded in ' + (process.hrtime(start)[1] / 1e6).toFixed(3) + ' ms')
+
+function lookup(file){
+	var basename = path.basename(file)
+	var ext = basename
+	var subi
+	var type
+
+	while((subi = ext.indexOf('.') + 1) && (ext = ext.substring(subi))){
+		if(type = GLOB_EXTENSIONS[ext])
+			return type;
+	}
+
+	for(var i = 0, glob; glob = GLOB_REGEXP[i]; i++){
+		if(glob[0].test(basename))
+			return glob[1];
+	}
+}
+
+mime.lookup = lookup
+mime.GLOBS_EXTENSIONS = GLOB_EXTENSIONS
+mime.GLOB_REGEXP = GLOB_REGEXP
